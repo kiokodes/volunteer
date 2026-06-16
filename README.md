@@ -1,179 +1,158 @@
-# NextGem Volunteer Check-In System
+# NextGem Volunteer Platform
 
-A purposeful, mobile-first volunteer management system that transforms QR code scanning into meaningful service tracking.
+A mobile-first web app for NextGem Foundation volunteers to check in/out at orphanages using QR codes, track hours, and earn gamification rewards.
 
-## Features
+---
 
-### For Volunteers
-- **QR Check-In**: Scan a QR code at the orphanage and tap your name to check in/out
-- **Volunteer Portal**: Login with your NYSC code to view your total hours and session history
-- **Real-time Tracking**: Automatic hours calculation when checking out
+## Quick Start (Deploy to Vercel)
 
-### For Administrators
-- **Dashboard**: Password-protected admin area to manage everything
-- **Add Orphanages**: Register new orphanages with auto-generated QR tokens
-- **Add Volunteers**: Register volunteers and assign them to specific orphanages
-- **View Stats**: See total hours, volunteer rankings, and flagged sessions
-- **QR URL Copy**: Click to copy the check-in URL for any orphanage
+### 1. Set up Supabase
 
-## Tech Stack
+1. Go to [supabase.com](https://supabase.com) and open your project (or create a new one)
+2. Navigate to **SQL Editor**
+3. Open `supabase-schema.sql` from this project and paste the entire contents
+4. Click **Run** — all tables and security policies will be created
 
-- **Framework**: Next.js 14 (App Router)
-- **Database**: Supabase (PostgreSQL)
-- **Styling**: CSS Modules + CSS Variables
-- **Deployment**: Vercel
+### 2. Get your environment variables
 
-## Quick Start
+From your Supabase project:
+- Go to **Settings → API**
+- Copy your **Project URL** and **anon public** key
 
-### 1. Install Dependencies
+### 3. Deploy to Vercel
+
+1. Push this project to a GitHub repository
+2. Go to [vercel.com](https://vercel.com) → **New Project** → import your repo
+3. Add these environment variables in Vercel's project settings:
+
+| Variable | Value |
+|----------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `INTERNAL_PLATFORM_API_URL` | URL of the Internal Ops Platform API (set this later) |
+| `INTERNAL_PLATFORM_API_SECRET` | A shared secret string you choose |
+| `NEXT_PUBLIC_APP_URL` | `https://volunteer.nextgemfoundation.com` |
+
+4. Click **Deploy**
+
+---
+
+## Local Development
 
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-### 2. Setup Supabase
+# 2. Copy env file and fill in your values
+cp .env.local.example .env.local
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run `supabase/schema.sql` in your SQL Editor
-3. Copy your project URL and anon key
+# 3. Start the dev server
+npm run dev
 
-### 3. Configure Environment
-
-Create `.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-DASHBOARD_PASSWORD=nextgem2024
-```
-
-### 4. Deploy to Vercel
-
-1. Push to GitHub
-2. Connect to Vercel
-3. Add environment variables in Vercel Settings
-4. Redeploy
-
-### 5. Seed Demo Data (Optional)
-
-```bash
-npm run seed
+# 4. Open http://localhost:3000
 ```
 
 ---
 
-## URLs
-
-| Route | Purpose |
-|-------|---------|
-| `/` | Landing page |
-| `/volunteer` | Volunteer login & hours view |
-| `/dashboard` | Admin dashboard (password protected) |
-| `/[qr_token]` | Check-in page (e.g., `/sunshine-home`) |
-
----
-
-## How It Works
-
-### 1. Admin Creates Orphanages
-
-In the dashboard, click "Add Orphanage":
-- Enter name (e.g., "Sunshine Children's Home")
-- Token auto-generates (e.g., "sunshine-home")
-- Click "Copy" to get the check-in URL
-
-### 2. Admin Registers Volunteers
-
-In the dashboard, click "Add Volunteer":
-- Enter full name
-- Enter NYSC code
-- Select assigned orphanage
-
-### 3. Volunteer Scans QR
-
-1. Matron displays QR code at orphanage (links to `/[token]`)
-2. Volunteer scans with phone camera
-3. Page loads showing only volunteers assigned to that orphanage
-4. Volunteer taps their name → taps "Check In"
-
-### 4. Volunteer Views Hours
-
-1. Go to `/volunteer`
-2. Enter NYSC code
-3. See total hours, monthly hours, and session history
-
----
-
-## Creating QR Codes
-
-After adding an orphanage, you'll see a URL like:
-```
-https://yourdomain.com/sunshine-home
-```
-
-**Option A: Use a QR Generator**
-1. Go to [qr-code-generator.com](https://www.qr-code-generator.com)
-2. Paste the URL
-3. Download and print
-
-**Option B: Use bit.ly**
-1. Shorten the URL with bit.ly
-2. Create QR code pointing to short URL
-
----
-
-## Database Schema
-
-### Tables
-
-| Table | Purpose |
-|-------|---------|
-| `orphanages` | Stores orphanage names and QR tokens |
-| `volunteers` | Stores volunteer info with orphanage assignment |
-| `sessions` | Stores check-in/check-out times and hours |
-
-### Relationships
-- Volunteer → Orphanage (one-to-many)
-- Session → Volunteer & Orphanage (many-to-one)
-
----
-
-## Customization
-
-### Colors
-Edit CSS variables in `app/globals.css`:
-```css
---color-primary: #1d56e8;  /* Your brand color */
-```
-
-### Dashboard Password
-Change `DASHBOARD_PASSWORD` in environment variables.
-
----
-
-## File Structure
+## Project Structure
 
 ```
+src/
 ├── app/
-│   ├── [token]/page.tsx      # Volunteer check-in page
-│   ├── dashboard/page.tsx    # Admin dashboard
-│   ├── volunteer/page.tsx    # Volunteer login & hours
-│   └── page.tsx              # Landing page
+│   ├── page.tsx              # Home / landing (redirects based on role)
+│   ├── layout.tsx            # Root layout (fonts, metadata)
+│   ├── globals.css           # Tailwind + global styles
+│   ├── auth/
+│   │   ├── login/page.tsx    # Sign in
+│   │   └── register/page.tsx # Volunteer registration
+│   ├── volunteer/
+│   │   └── page.tsx          # Volunteer dashboard (hours, badges, progress)
+│   ├── scan/
+│   │   └── page.tsx          # QR scan + check-in/out flow
+│   ├── leaderboard/
+│   │   └── page.tsx          # Public leaderboard
+│   ├── orphanage/
+│   │   └── qr/page.tsx       # Matron: print QR + view today's volunteers
+│   └── api/
+│       ├── sync/route.ts     # Sync check records to Internal Platform
+│       └── sync-flag/route.ts # Sync flags to Internal Platform
 ├── components/
-│   ├── ManageOrphanages.tsx  # Admin: Add orphanage form
-│   ├── ManageVolunteers.tsx  # Admin: Add volunteer form
-│   ├── VolunteerCard.tsx     # Check-in volunteer selection
-│   └── ...                   # Other UI components
+│   └── CertificateButton.tsx # Download PDF certificate
 ├── lib/
-│   ├── supabase.ts           # Supabase client
-│   ├── types.ts              # TypeScript types
-│   └── utils.ts              # Helper functions
-└── supabase/
-    └── schema.sql            # Database schema
+│   ├── supabase/
+│   │   ├── client.ts         # Browser Supabase client
+│   │   └── server.ts         # Server Supabase client
+│   ├── gamification.ts       # Badge/points/milestone logic
+│   ├── sync.ts               # POST data to Internal Platform
+│   └── certificate.ts        # PDF certificate generator (jsPDF)
+├── types/
+│   └── index.ts              # All TypeScript types + constants
+└── middleware.ts             # Auth guard for protected routes
 ```
 
 ---
 
-## License
+## User Roles
 
-MIT
+| Role | How to create | Access |
+|------|--------------|--------|
+| **Volunteer** | Self-register at `/auth/register` | Dashboard, scan, leaderboard |
+| **Matron** | Admin creates via Supabase dashboard | QR code page, flag volunteers |
+| **Admin** | Set manually in Supabase `profiles` table | Full access |
+
+To create a Matron account manually:
+1. Have them register as a volunteer at `/auth/register`
+2. In Supabase → Table Editor → `profiles`, find their row
+3. Change `role` from `volunteer` to `matron`
+4. In the `orphanages` table, set `matron_id` to their user ID
+
+---
+
+## Gamification System
+
+| Milestone | Hours | Badge | Points | Certificate? |
+|-----------|-------|-------|--------|-------------|
+| First Steps | 10 hrs | 🟢 Basic | 100 pts | No |
+| Dedicated | 100 hrs | 🔵 Intermediate | 1,000 pts | **Yes** |
+| Champion | 1,000 hrs | 🟡 Advanced | 10,000 pts | No |
+
+Points are earned at **10 points per hour** on top of milestone bonuses.
+
+---
+
+## QR Code Flow
+
+1. Admin creates an orphanage record in Supabase → a unique `qr_code_token` is auto-generated
+2. The matron opens `/orphanage/qr` and prints the QR code
+3. The QR code contains the URL: `https://volunteer.nextgemfoundation.com/scan?token=<token>`
+4. Volunteer scans with their phone camera → check-in/out page opens
+5. Hours are calculated on checkout and synced to the Internal Platform
+
+---
+
+## Syncing to the Internal Operations Platform
+
+When a volunteer checks out, the platform:
+1. Saves the record locally in Supabase (`synced_to_internal = false`)
+2. Calls `POST /api/sync` which posts the record to the Internal Platform
+3. Marks `synced_to_internal = true` on success
+
+If the sync fails (network issue), the record stays in Supabase and can be retried. The volunteer's hours are always saved — sync failure never causes data loss.
+
+The Internal Platform must expose:
+- `POST /api/volunteer-hours` — accepts a `CheckRecord` JSON body
+- `POST /api/volunteer-flags` — accepts a flag JSON body
+- `POST /api/volunteer-certificates` — accepts `{ volunteer_id, issued_at }`
+
+All requests include the header: `x-api-secret: <INTERNAL_PLATFORM_API_SECRET>`
+
+---
+
+## Offline Support
+
+The platform stores check-in/out records in Supabase immediately. If a volunteer has poor connectivity:
+- Check-in is saved locally as soon as they tap the button
+- Sync to the Internal Platform retries on the next action
+- `synced_to_internal = false` flags all unsynced records for future retry
+
+A background retry job can be added later using Supabase Edge Functions or a cron job that queries unsynced records.
