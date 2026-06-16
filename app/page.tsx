@@ -51,11 +51,11 @@ export default function Home() {
         </div>
 
         <div className={styles.actions}>
-          <Link href="/sunshine-home" className={styles.primaryBtn}>
-            Try Demo Check-In
+          <Link href="/volunteer" className={styles.primaryBtn}>
+            Volunteer Login
           </Link>
           <Link href="/dashboard" className={styles.secondaryBtn}>
-            View Dashboard
+            Admin Dashboard
           </Link>
         </div>
 

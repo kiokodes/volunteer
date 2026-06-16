@@ -4,17 +4,18 @@ import { useState, useEffect } from 'react';
 import styles from './page.module.css';
 import { supabase } from '@/lib/supabase';
 import { DashboardStats, OrphanageStats, VolunteerStats, FlaggedSession } from '@/lib/types';
-import { formatHours, formatTime, getHoursOpen } from '@/lib/utils';
+import { formatHours, formatTime } from '@/lib/utils';
 import PasswordGate from '@/components/PasswordGate';
 import StatCard from '@/components/StatCard';
-import OrphanageCard from '@/components/OrphanageCard';
-import VolunteerRow from '@/components/VolunteerRow';
-import { Users, Building2, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
+import ManageOrphanages from '@/components/ManageOrphanages';
+import ManageVolunteers from '@/components/ManageVolunteers';
+import { Building2, Users, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function DashboardPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [orphanages, setOrphanages] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const handlePasswordSubmit = (password: string): boolean => {
@@ -27,42 +28,22 @@ export default function DashboardPage() {
   };
 
   const fetchStats = async () => {
+    if (!supabase) return;
+
     setLoading(true);
     setError(null);
 
     try {
-      // Fetch orphanages with volunteer counts and hours
-      const { data: orphanages, error: orphanagesError } = await supabase
+      // Fetch orphanages
+      const { data: orphanagesData } = await supabase
         .from('orphanages')
-        .select(`
-          id,
-          name,
-          volunteers (count)
-        `);
+        .select('*')
+        .order('name');
 
-      if (orphanagesError) throw orphanagesError;
+      setOrphanages(orphanagesData || []);
 
-      // Fetch all sessions to calculate hours
-      const { data: allSessions } = await supabase
-        .from('sessions')
-        .select('*');
-
-      const sessions = allSessions || [];
-
-      // Calculate hours per orphanage
-      const orphanageStats: OrphanageStats[] = (orphanages || []).map(o => {
-        const orphanageSessions = sessions.filter(s => s.orphanage_id === o.id);
-        const totalHours = orphanageSessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
-        return {
-          id: o.id,
-          name: o.name,
-          volunteer_count: (o as any).volunteers?.[0]?.count || 0,
-          total_hours: totalHours
-        };
-      });
-
-      // Fetch volunteers with their stats
-      const { data: volunteers } = await supabase
+      // Fetch volunteers with orphanage names
+      const { data: volunteersData } = await supabase
         .from('volunteers')
         .select(`
           id,
@@ -70,9 +51,30 @@ export default function DashboardPage() {
           nysc_code,
           orphanage_id,
           orphanages (name)
-        `);
+        `)
+        .order('name');
 
-      const volunteerStats: VolunteerStats[] = (volunteers || []).map(v => {
+      // Fetch all sessions
+      const { data: allSessions } = await supabase
+        .from('sessions')
+        .select('*');
+
+      const sessions = allSessions || [];
+
+      // Calculate hours per orphanage
+      const orphanageStats: OrphanageStats[] = (orphanagesData || []).map(o => {
+        const orphanageSessions = sessions.filter(s => s.orphanage_id === o.id);
+        const totalHours = orphanageSessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
+        return {
+          id: o.id,
+          name: o.name,
+          volunteer_count: volunteersData?.filter(v => v.orphanage_id === o.id).length || 0,
+          total_hours: totalHours
+        };
+      });
+
+      // Calculate volunteer stats
+      const volunteerStats: VolunteerStats[] = (volunteersData || []).map(v => {
         const volunteerSessions = sessions.filter(s => s.volunteer_id === v.id);
         const totalHours = volunteerSessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
         return {
@@ -85,7 +87,7 @@ export default function DashboardPage() {
         };
       }).sort((a, b) => b.total_hours - a.total_hours);
 
-      // Find flagged sessions (open more than 8 hours)
+      // Find flagged sessions
       const now = new Date();
       const flaggedSessions: FlaggedSession[] = sessions
         .filter(s => !s.check_out_time)
@@ -93,8 +95,8 @@ export default function DashboardPage() {
           const checkIn = new Date(s.check_in_time);
           const hoursOpen = (now.getTime() - checkIn.getTime()) / (1000 * 60 * 60);
           if (hoursOpen >= 8) {
-            const volunteer = volunteers?.find(v => v.id === s.volunteer_id);
-            const orphanage = orphanages?.find(o => o.id === s.orphanage_id);
+            const volunteer = volunteersData?.find(v => v.id === s.volunteer_id);
+            const orphanage = orphanagesData?.find(o => o.id === s.orphanage_id);
             return {
               id: s.id,
               volunteer_name: volunteer?.name || 'Unknown',
@@ -110,8 +112,8 @@ export default function DashboardPage() {
       const totalHours = sessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
 
       setStats({
-        total_orphanages: orphanages?.length || 0,
-        total_volunteers: volunteers?.length || 0,
+        total_orphanages: orphanagesData?.length || 0,
+        total_volunteers: volunteersData?.length || 0,
         total_hours: totalHours,
         flagged_sessions: flaggedSessions,
         orphanages: orphanageStats,
@@ -212,7 +214,7 @@ export default function DashboardPage() {
               <section className={styles.section}>
                 <h2 className={styles.sectionTitle}>
                   <AlertTriangle size={18} className={styles.warningIcon} />
-                  Flagged Sessions
+                  Flagged Sessions (No check-out after 8+ hours)
                 </h2>
                 <div className={styles.flaggedList}>
                   {stats.flagged_sessions.map(session => (
@@ -235,29 +237,42 @@ export default function DashboardPage() {
               </section>
             )}
 
-            {/* Orphanages */}
+            {/* Manage Orphanages */}
             <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>Orphanages</h2>
-              <div className={styles.cardList}>
-                {stats.orphanages.map(orphanage => (
-                  <OrphanageCard key={orphanage.id} orphanage={orphanage} />
-                ))}
-              </div>
+              <ManageOrphanages 
+                orphanages={orphanages} 
+                onUpdate={fetchStats}
+              />
             </section>
 
-            {/* Volunteers */}
+            {/* Manage Volunteers */}
             <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>Volunteers by Hours</h2>
-              <div className={styles.volunteerList}>
-                {stats.volunteers.map((volunteer, index) => (
-                  <VolunteerRow 
-                    key={volunteer.id} 
-                    volunteer={volunteer} 
-                    rank={index + 1}
-                  />
-                ))}
-              </div>
+              <ManageVolunteers onUpdate={fetchStats} />
             </section>
+
+            {/* Top Volunteers */}
+            {stats.volunteers.length > 0 && (
+              <section className={styles.section}>
+                <h2 className={styles.sectionTitle}>Top Volunteers by Hours</h2>
+                <div className={styles.volunteerList}>
+                  {stats.volunteers.slice(0, 10).map((volunteer, index) => (
+                    <div 
+                      key={volunteer.id} 
+                      className={`${styles.volunteerItem} ${index < 3 ? styles.topRank : ''}`}
+                    >
+                      <span className={styles.rank}>{index + 1}</span>
+                      <div className={styles.volunteerInfo}>
+                        <span className={styles.volunteerName}>{volunteer.name}</span>
+                        <span className={styles.volunteerMeta}>
+                          {volunteer.orphanage_name} • {volunteer.total_sessions} sessions
+                        </span>
+                      </div>
+                      <span className={styles.volunteerHours}>{formatHours(volunteer.total_hours)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </>
         )}
       </div>

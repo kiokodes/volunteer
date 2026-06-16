@@ -224,6 +224,69 @@
   box-shadow: var(--shadow-sm);
 }
 
+.volunteerItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.volunteerItem:last-child {
+  border-bottom: none;
+}
+
+.volunteerItem:hover {
+  background: var(--color-bg);
+}
+
+.volunteerItem.topRank {
+  background: linear-gradient(90deg, var(--color-primary-light) 0%, transparent 50%);
+}
+
+.rank {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.volunteerInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.volunteerName {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.volunteerMeta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.volunteerHours {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-full);
+}
+
 @media (max-width: 600px) {
   .header {
     flex-direction: column;

@@ -30,6 +30,12 @@ export default function CheckInPage() {
 
   const fetchOrphanageData = useCallback(async () => {
     if (!token) return;
+    
+    if (!supabase) {
+      setError('Database not configured. Please check environment variables.');
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -99,7 +105,7 @@ export default function CheckInPage() {
   }, [fetchOrphanageData]);
 
   const handleCheckIn = async () => {
-    if (!selectedId || !orphanage) return;
+    if (!selectedId || !orphanage || !supabase) return;
 
     setActionLoading(true);
     try {
@@ -144,7 +150,7 @@ export default function CheckInPage() {
   };
 
   const handleCheckOut = async () => {
-    if (!selectedId) return;
+    if (!selectedId || !supabase) return;
 
     const volunteer = volunteers.find(v => v.id === selectedId);
     if (!volunteer?.current_session) return;
@@ -197,6 +203,22 @@ export default function CheckInPage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <LoadingSkeleton />
+        </div>
+      </main>
+    );
+  }
+
+  if (!supabase) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.container}>
+          <div className={styles.errorState}>
+            <div className={styles.errorIcon}>
+              <AlertCircle size={48} />
+            </div>
+            <h1 className={styles.errorTitle}>Configuration Required</h1>
+            <p className={styles.errorMessage}>Environment variables are not set. Please configure Supabase credentials.</p>
+          </div>
         </div>
       </main>
     );
