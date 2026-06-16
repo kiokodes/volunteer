@@ -1,8 +1,8 @@
 {
   "name": "nextgem-volunteer-platform",
   "version": "1.0.0",
-  "description": "NextGem Foundation - Gamified Volunteer Platform",
   "private": true,
+  "description": "NextGem Foundation - Gamified Volunteer Platform",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,28 +10,24 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.3",
+    "next": "14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.43.1",
-    "@supabase/ssr": "^0.3.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/ssr": "^0.5.0",
     "html5-qrcode": "^2.3.8",
-    "qrcode": "^1.5.3",
+    "qrcode": "^1.5.4",
     "jspdf": "^2.5.1",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.383.0",
-    "clsx": "^2.1.1"
+    "lucide-react": "^0.439.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/qrcode": "^1.5.5",
-    "typescript": "^5",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.3",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8",
-    "autoprefixer": "^10"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.4"
   }
 }

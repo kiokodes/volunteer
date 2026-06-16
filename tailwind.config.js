@@ -1,48 +1,28 @@
 /** @type {import('tailwindcss').Config} */
+
+// Tailwind CSS configuration
+// Using a custom color palette inspired by NextGem Foundation's brand (gem/green tones).
 module.exports = {
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
-      // NextGem brand colours: clean, minimal, professional blue palette
       colors: {
+        // Brand colors - emerald/green to represent growth and gems
         brand: {
-          50:  "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          400: "#60a5fa",
-          500: "#3b82f6", // Primary brand blue
-          600: "#2563eb",
-          700: "#1d4ed8",
-          800: "#1e40af",
-          900: "#1e3a8a",
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          300: '#86efac',
+          400: '#4ade80',
+          500: '#22c55e',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
         },
-        surface: {
-          DEFAULT: "#ffffff",
-          subtle:  "#f8fafc",
-          muted:   "#f1f5f9",
-        },
-        ink: {
-          DEFAULT: "#0f172a",
-          muted:   "#475569",
-          faint:   "#94a3b8",
-        },
-        success: "#16a34a",
-        warning: "#d97706",
-        danger:  "#dc2626",
-      },
-      fontFamily: {
-        // Inter for body copy; system-ui fallback keeps it fast on mobile
-        sans: ["Inter", "system-ui", "sans-serif"],
-      },
-      borderRadius: {
-        DEFAULT: "8px",
-        lg: "12px",
-        xl: "16px",
       },
     },
   },
