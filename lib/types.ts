@@ -1,9 +1,5 @@
 /**
- * Shared TypeScript types for the NextGem Volunteer Platform.
- * These mirror the Supabase schema (see supabase/schema.sql).
- *
- * Keeping them in one place makes it easy to refactor later when we
- * sync with the Internal Operations Platform.
+ * TypeScript types matching the volunteer-platform Supabase schema.
  */
 
 export interface Orphanage {
@@ -15,22 +11,47 @@ export interface Orphanage {
   matron_name?: string | null;
   matron_phone?: string | null;
   matron_email?: string | null;
-  qr_code: string;
+  // Currently-active QR token (the one encoded in the printed QR).
+  current_qr_code?: string | null;
+  // When the current QR expires. NULL = never expires.
+  qr_expires_at?: string | null;
+  // When was the QR last rotated.
+  qr_rotated_at?: string | null;
   is_active: boolean;
   verified: boolean;
   created_at: string;
   updated_at: string;
 }
 
+export interface QrRotation {
+  id: string;
+  orphanage_id: string;
+  qr_code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  rotated_by?: string | null;
+  reason?: string | null;
+  created_at: string;
+}
+
 export interface Volunteer {
   id: string;
   user_id?: string | null;
   full_name: string;
-  email: string;
+  // The NextGem code (matriculation-style identifier).
+  nextgem_code: string;
+  // Synthetic auth email. Computed from nextgem_code.
+  auth_email: string;
+  contact_email?: string | null;
   phone?: string | null;
+  // Role on the platform.
+  role: 'volunteer' | 'matron' | 'admin';
+  // Orphanage assignment for matrons.
+  assigned_orphanage_id?: string | null;
   total_points: number;
   total_hours: number;
   certificate_issued_at?: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -39,6 +60,7 @@ export interface CheckIn {
   id: string;
   volunteer_id: string;
   orphanage_id: string;
+  scanned_qr_code?: string | null;
   type: 'in' | 'out';
   scanned_at: string;
   notes?: string | null;
@@ -54,7 +76,7 @@ export interface VolunteerHour {
   check_out_id?: string | null;
   hours: number;
   points_earned: number;
-  date: string; // ISO date e.g. '2026-06-16'
+  date: string;
   synced_to_internal: boolean;
   created_at: string;
   updated_at: string;
@@ -89,4 +111,15 @@ export interface Flag {
   resolved_notes?: string | null;
   synced_to_internal: boolean;
   created_at: string;
+}
+
+/**
+ * View of the currently signed-in user, derived from
+ * volunteers + auth metadata. Returned by getCurrentUser().
+ */
+export interface CurrentUser {
+  // The volunteers row.
+  volunteer: Volunteer;
+  // Supabase auth metadata (email, etc).
+  email: string;
 }

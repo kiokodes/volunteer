@@ -1,152 +1,250 @@
 'use client';
 
 /**
- * Orphanage QR page (Matron view).
+ * Matron QR code page.
  *
- * Matrons come here to:
- *   1. See all orphanages and their unique QR codes.
- *   2. Print a QR code to stick at the orphanage entrance.
+ * Shows ONLY the current, valid QR code for the matron's assigned
+ * orphanage. Once the QR expires (typically monthly), a banner appears
+ * saying they need to contact NextGem staff for a new one.
  *
- * Phase 1 simplification: we just list all orphanages and let the matron
- * pick one. In a future version this would be filtered to "their" orphanage
- * via Supabase Auth + matron role.
+ * Access control:
+ *   - Only users with role='matron' or role='admin' can reach this page.
+ *   - Matrons are tied to ONE orphanage (assigned_orphanage_id). They
+ *     only see THEIR orphanage's QR - not any other.
+ *   - Admins see the QR for any orphanage (covered in admin pages).
+ *
+ * No QR is ever "permanent" - they rotate, typically monthly. This
+ * prevents anyone from hoarding a single QR for a year of points.
  */
 
 import { useEffect, useState } from 'react';
-import { getSupabaseClient } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { QRGenerator } from '@/components/QRGenerator';
-import type { Orphanage } from '@/lib/types';
-import { Printer } from 'lucide-react';
+import { getSupabaseClient } from '@/lib/supabase';
+import { QrCode, LogOut, AlertTriangle, RefreshCw, Calendar, Building2, Phone, Mail } from 'lucide-react';
 
 export default function OrphanageQRPage() {
-  const [orphanages, setOrphanages] = useState<Orphanage[]>([]);
-  const [selected, setSelected] = useState<Orphanage | null>(null);
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [orphanage, setOrphanage] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       const supabase = getSupabaseClient();
-      const { data } = await supabase
-        .from('orphanages')
+
+      // 1. Auth check.
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        router.push('/login?redirect=/orphanage/qr');
+        return;
+      }
+
+      // 2. Find the volunteer record.
+      const { data: volunteer, error: volErr } = await supabase
+        .from('volunteers')
         .select('*')
-        .eq('is_active', true)
-        .order('name');
-      setOrphanages(data ?? []);
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      if (volErr || !volunteer) {
+        setError('Volunteer profile not found. Contact NextGem staff.');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Permission check: must be matron or admin.
+      if (volunteer.role !== 'matron' && volunteer.role !== 'admin') {
+        setError(
+          'Only matrons and NextGem staff can access QR codes. ' +
+          'If you should have access, ask NextGem to update your role.'
+        );
+        setLoading(false);
+        return;
+      }
+
+      setUser(volunteer);
+
+      // 4. Load the orphanage.
+      // Matrons can only see their assigned orphanage. Admins can see any
+      // (we default to the first one or any passed via ?id=).
+      const orphanageId = volunteer.assigned_orphanage_id;
+      if (!orphanageId) {
+        setError('No orphanage assigned to your account. Contact NextGem.');
+        setLoading(false);
+        return;
+      }
+
+      const { data: orph } = await supabase
+        .from('orphanages').select('*').eq('id', orphanageId).maybeSingle();
+      if (!orph) {
+        setError('Your assigned orphanage was not found.');
+        setLoading(false);
+        return;
+      }
+
+      setOrphanage(orph);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [router]);
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') window.print();
+  const handleLogout = async () => {
+    const supabase = getSupabaseClient();
+    await supabase.auth.signOut();
+    router.push('/');
   };
 
   if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-gray-500">Loading…</p>
+      </div>
+    );
   }
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
-        Orphanage QR Codes
-      </h1>
-      <p className="text-gray-600 mb-6">
-        Print these QR codes and place them at your orphanage entrance. Volunteers
-        scan them to check in and out.
-      </p>
-
-      {!selected ? (
-        // List of orphanages.
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {orphanages.length === 0 ? (
-            <div className="col-span-2 text-center py-12 bg-white rounded-lg shadow">
-              <p className="text-gray-600">
-                No orphanages yet. Add one in the Internal Operations Platform
-                first.
-              </p>
-            </div>
-          ) : (
-            orphanages.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => setSelected(o)}
-                className="text-left bg-white rounded-lg shadow p-5 hover:shadow-lg transition-shadow border-l-4 border-brand-500"
-              >
-                <p className="font-semibold text-gray-900">{o.name}</p>
-                <p className="text-sm text-gray-600 mt-1">{o.state}</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  QR: <code>{o.qr_code}</code>
-                </p>
-              </button>
-            ))
-          )}
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="bg-white rounded-lg shadow p-6 max-w-md text-center">
+          <AlertTriangle className="mx-auto text-red-500" size={40} />
+          <p className="mt-3 text-gray-900 font-semibold">Access denied</p>
+          <p className="text-sm text-gray-600 mt-2">{error}</p>
+          <Link href="/" className="inline-block mt-4 text-brand-600 hover:underline text-sm">
+            Go to homepage
+          </Link>
         </div>
-      ) : (
-        // QR detail / print view.
-        <div>
-          <button
-            onClick={() => setSelected(null)}
-            className="text-sm text-brand-600 underline mb-4"
-          >
-            ← Back to list
-          </button>
+      </div>
+    );
+  }
 
-          <div className="bg-white rounded-lg shadow p-6 max-w-md mx-auto print:shadow-none">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">NextGem Volunteer Check-In</p>
-              <h2 className="text-2xl font-bold text-gray-900 mt-1">
-                {selected.name}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {selected.city ? `${selected.city}, ` : ''}
-                {selected.state}
+  if (!orphanage) return null;
+
+  // Check if QR is expired.
+  const isExpired = orphanage.qr_expires_at && new Date(orphanage.qr_expires_at) < new Date();
+  const hasQR = !!orphanage.current_qr_code;
+  const expiryDate = orphanage.qr_expires_at ? new Date(orphanage.qr_expires_at) : null;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <header className="max-w-2xl mx-auto flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Building2 className="text-brand-600" size={20} />
+          <span className="font-semibold text-gray-900">{orphanage.name}</span>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="text-sm text-gray-600 hover:text-red-600 flex items-center gap-1"
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
+      </header>
+
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">QR Code</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              Print and display this at your orphanage entrance. Volunteers scan it to check in.
+            </p>
+          </div>
+
+          {/* Expiry status banner. */}
+          {isExpired && (
+            <div className="bg-red-50 border border-red-200 rounded p-3 mb-4 flex items-start gap-2">
+              <AlertTriangle size={16} className="text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-red-800">
+                <p className="font-semibold">This QR has expired.</p>
+                <p>
+                  Contact NextGem staff to get a new QR code. Old scans will be rejected.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!hasQR && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-4 flex items-start gap-2">
+              <AlertTriangle size={16} className="text-yellow-700 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-yellow-800">
+                No QR code has been generated yet. Contact NextGem staff.
               </p>
             </div>
+          )}
 
-            <div className="flex justify-center my-6">
+          {/* The QR itself. Render with reduced opacity if expired so
+              matrons see clearly that it's no longer valid. */}
+          {hasQR && (
+            <div className={`bg-white border-2 border-dashed border-gray-300 rounded-lg p-6 flex justify-center ${isExpired ? 'opacity-30 grayscale' : ''}`}>
               <QRGenerator
-                qrCode={selected.qr_code}
-                orphanageName={selected.name}
+                qrCode={orphanage.current_qr_code}
+                orphanageName={orphanage.name}
                 size={300}
               />
             </div>
+          )}
 
-            <div className="text-center">
-              <p className="text-sm text-gray-700">
-                Volunteers: scan this code to check in and out.
+          {/* Expiry + rotation info. */}
+          {hasQR && (
+            <div className="mt-4 text-sm text-gray-700 space-y-1">
+              <p className="flex items-center gap-2">
+                <Calendar size={14} className="text-gray-400" />
+                {expiryDate ? (
+                  <>
+                    Valid until:{' '}
+                    <strong>{expiryDate.toLocaleDateString('en-US', { dateStyle: 'long' })}</strong>
+                    {' '}
+                    <span className="text-gray-500">
+                      ({Math.ceil((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days left)
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-gray-500">(no expiry set)</span>
+                )}
               </p>
-              <p className="text-xs text-gray-500 mt-2">
-                Need help? Contact your NextGem coordinator.
+              <p className="flex items-center gap-2 text-xs text-gray-500">
+                <RefreshCw size={12} />
+                {orphanage.qr_rotated_at
+                  ? `Last rotated: ${new Date(orphanage.qr_rotated_at).toLocaleDateString()}`
+                  : 'Never rotated'}
               </p>
             </div>
-          </div>
-
-          {/* Print button - hidden when printing */}
-          <div className="text-center mt-6 print:hidden">
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-5 py-3 bg-brand-600 text-white rounded-md hover:bg-brand-700 font-semibold"
-            >
-              <Printer size={18} />
-              Print this QR code
-            </button>
-          </div>
-
-          {/* Print-only styles - simple inline approach so it works without
-              a separate CSS file. */}
-          <style jsx global>{`
-            @media print {
-              nav,
-              .print\\:hidden {
-                display: none !important;
-              }
-              body {
-                background: white !important;
-              }
-            }
-          `}</style>
+          )}
         </div>
-      )}
+
+        {/* Print tips */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+          <p className="font-semibold mb-1">Print tips:</p>
+          <ul className="text-xs space-y-1 text-blue-800">
+            <li>• Print at 300 DPI minimum so it scans cleanly from 1+ meters away.</li>
+            <li>• Laminate to protect from weather if displayed outdoors.</li>
+            <li>• Mount at chest-to-eye height near the entrance.</li>
+            <li>• Do NOT share the QR on social media - it can be misused.</li>
+          </ul>
+        </div>
+
+        {/* Contacts */}
+        <div className="bg-white rounded-lg shadow p-5">
+          <h3 className="font-semibold text-gray-900 mb-3">Your contact info</h3>
+          {orphanage.matron_name && (
+            <p className="text-sm">
+              <span className="font-medium">{orphanage.matron_name}</span>
+              <span className="text-xs text-gray-500 ml-2">Matron</span>
+            </p>
+          )}
+          {orphanage.matron_phone && (
+            <p className="text-xs flex items-center gap-1 mt-1 text-gray-600">
+              <Phone size={12} />{orphanage.matron_phone}
+            </p>
+          )}
+          {orphanage.matron_email && (
+            <p className="text-xs flex items-center gap-1 mt-1 text-gray-600">
+              <Mail size={12} />{orphanage.matron_email}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

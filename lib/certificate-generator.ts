@@ -191,7 +191,8 @@ async function sendCertificateDelivery(
   const supabase = getSupabaseClient();
 
   // Email via Resend (server-side).
-  if (process.env.RESEND_API_KEY && volunteer.email) {
+  const volunteerEmail = volunteer.contact_email ?? volunteer.auth_email;
+  if (process.env.RESEND_API_KEY && volunteerEmail) {
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -201,7 +202,7 @@ async function sendCertificateDelivery(
         },
         body: JSON.stringify({
           from: process.env.CERTIFICATE_FROM_EMAIL ?? 'certificates@nextgemfoundation.com',
-          to: volunteer.email,
+          to: volunteerEmail,
           subject: 'Your NextGem Certificate - 100 Hours Milestone!',
           html: `
             <p>Hi ${escapeHtml(volunteer.full_name)},</p>

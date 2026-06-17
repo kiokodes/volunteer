@@ -1,46 +1,51 @@
 /**
  * Supabase clients for the NextGem Volunteer Platform.
  *
- * Two clients are exported:
- *   - `getSupabaseClient()`  - browser-safe client using the anon key.
- *                              Used in client components and pages.
- *   - `getSupabaseAdmin()`   - server-only client using the service role key.
- *                              Has full access. NEVER expose to the browser.
- *                              Used for: webhooks, cron, syncing to internal platform.
+ * Two clients:
+ *   - getSupabaseClient() - browser-safe (uses anon key). Used by the
+ *     volunteer UI for scanning QR codes, viewing the public leaderboard,
+ *     and signing in (with NextGem code).
+ *   - getSupabaseAdmin()  - server-only (uses service role). Used by API
+ *     routes that need to bypass RLS (QR rotation, awarding badges, etc).
  *
- * Why two clients?
- *   Supabase enforces Row Level Security based on the JWT of the requesting client.
- *   The anon client respects RLS (good for users). The service role client
- *   bypasses RLS (needed for admin operations like pushing hours to the
- *   Internal Operations Platform).
+ * The auth flow:
+ *   Volunteers sign in with their NextGem code (e.g. NG-2026-V-0042) +
+ *   password. We convert the code to a synthetic email
+ *   (ng-2026-v-0042@nextgem.volunteers) and call Supabase Auth with that.
+ *   This lets us keep using Supabase's built-in auth + RLS without
+ *   building a separate auth system.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Cache the clients so we don't create a new one on every request.
 let _anonClient: SupabaseClient | null = null;
 let _adminClient: SupabaseClient | null = null;
 
 /**
+ * Convert a NextGem code to the synthetic auth email.
+ * Example: NG-2026-V-0042 -> ng-2026-v-0042@nextgem.volunteers
+ */
+export function codeToEmail(code: string): string {
+  return `${code.toLowerCase().replace(/[^a-z0-9]/g, '')}@nextgem.volunteers`;
+}
+
+/**
  * Browser-safe Supabase client.
- * Uses NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
- * which are safe to expose (they're meant to be public).
  */
 export function getSupabaseClient(): SupabaseClient {
   if (_anonClient) return _anonClient;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!url || !anonKey) {
+  if (!url || !key) {
     throw new Error(
-      'Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local. See README.md for setup.'
+      'Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local.'
     );
   }
 
-  _anonClient = createClient(url, anonKey, {
+  _anonClient = createClient(url, key, {
     auth: {
-      // Persist session in localStorage so volunteers stay logged in across refreshes.
       persistSession: true,
       autoRefreshToken: true,
     },
@@ -50,25 +55,21 @@ export function getSupabaseClient(): SupabaseClient {
 
 /**
  * Server-only admin Supabase client.
- * Uses SUPABASE_SERVICE_ROLE_KEY which must NEVER be exposed to the browser.
- * Bypasses Row Level Security - use with care.
- *
- * Only call this from API routes (server-side code). Never import it in a
- * 'use client' component.
+ * Uses SUPABASE_SERVICE_ROLE_KEY - never expose to the browser.
  */
 export function getSupabaseAdmin(): SupabaseClient {
   if (_adminClient) return _adminClient;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !serviceKey) {
+  if (!url || !key) {
     throw new Error(
-      'Missing Supabase admin env vars. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local.'
+      'Missing Supabase admin env vars. Set SUPABASE_SERVICE_ROLE_KEY in .env.local.'
     );
   }
 
-  _adminClient = createClient(url, serviceKey, {
+  _adminClient = createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
